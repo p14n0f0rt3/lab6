@@ -52,34 +52,50 @@ long int GetPeriod (int n)
 	unsigned int saved_TCNT1a, saved_TCNT1b;
 	
 	overflow=0;
+
 	TIFR1=1; // TOV1 can be cleared by writing a logic one to its bit location.  Check ATmega328P datasheet page 113.
+	printf("1\r\n");
 	while (PIN_PERIOD!=0) // Wait for square wave to be 0
 	{
+		printf(".");
 		if(TIFR1&1)	{ TIFR1=1; overflow++; if(overflow>5) return 0;}
 	}
+	printf("\r\n");
+	printf("2\r\n");
 	overflow=0;
 	TIFR1=1;
 	while (PIN_PERIOD==0) // Wait for square wave to be 1
 	{
+		printf("-");
 		if(TIFR1&1)	{ TIFR1=1; overflow++; if(overflow>5) return 0;}
 	}
+	printf("\r\n");
+	printf("4\r\n");
 	
 	overflow=0;
 	TIFR1=1;
 	saved_TCNT1a=TCNT1;
 	for(i=0; i<n; i++) // Measure the time of 'n' periods
 	{
+		printf("5\r\n");
 		while (PIN_PERIOD!=0) // Wait for square wave to be 0
 		{
+			printf("*\r\n");
 			if(TIFR1&1)	{ TIFR1=1; overflow++; if(overflow>1024) return 0;}
 		}
+		printf("\r\n");
+		printf("7\r\n");
 		while (PIN_PERIOD==0) // Wait for square wave to be 1
 		{
+			printf("&");
 			if(TIFR1&1)	{ TIFR1=1; overflow++; if(overflow>1024) return 0;}
 		}
+		printf("\r\n");
 	}
 	saved_TCNT1b=TCNT1;
-	if(saved_TCNT1b<saved_TCNT1a) overflow--; // Added an extra overflow.  Get rid of it.
+	//if(saved_TCNT1b<saved_TCNT1a) overflow--; // Added an extra overflow.  Get rid of it.
+
+	printf("%ld\r\n", overflow*0x10000L+(saved_TCNT1b-saved_TCNT1a));
 
 	return overflow*0x10000L+(saved_TCNT1b-saved_TCNT1a);
 }
@@ -87,8 +103,8 @@ long int GetPeriod (int n)
 int main(void)
 {
 	long int count;
-	float T, f;
-	
+	float T;
+
 	usart_init(); // Configure the usart and baudrate
 	
 	DDRB  &= 0b11111101; // Configure PB1 as input
@@ -106,13 +122,13 @@ int main(void)
 		count=GetPeriod(1);
 		if(count>0)
 		{
-			T=count/(F_CPU*100.0);
-			f=1/T;
-			printf("f=%fHz (count=%lu)     \r", f, count);
+			T=(float)count/(F_CPU*100.0);
+			//f=1/T;
+			printf("T = %f\r\n", T);
 		}
 		else
 		{
-			printf("NO SIGNAL                     \r");
+			printf("NO SIGNAL -- %ld                    \r\n", count);
 		}
 		waitms(200);
 	}
