@@ -3,18 +3,18 @@ OBJS=main.o usart.o lcd.o
 PORTN=$(shell type COMPORT.inc)
 
 main.elf: $(OBJS)
-	avr-gcc -mmcu=atmega328p $(OBJS) -o main.elf
+	avr-gcc -Wl,-u,vfprintf -lprintf_flt -lm -mmcu=atmega328p $(OBJS) -o main.elf
 	avr-objcopy -j .text -j .data -O ihex main.elf main.hex
 	@echo done!
 	
 main.o: main.c usart.h
-	avr-gcc -g -Os -Wall -mmcu=atmega328p -c main.c
+	avr-gcc -Wl,-u,vfprintf -lprintf_flt -lm -g -Os -Wall -mmcu=atmega328p -c main.c
 
 usart.o: usart.c usart.h
-	avr-gcc -g -Os -Wall -mmcu=atmega328p -c usart.c
+	avr-gcc -Wl,-u,vfprintf -lprintf_flt -lm -g -Os -Wall -mmcu=atmega328p -c usart.c
 
 lcd.o: lcd.c usart.h LCD.h
-	avr-gcc -g -Os -Wall -mmcu=atmega328p -c lcd.c
+	avr-gcc -Wl,-u,vfprintf -lprintf_flt -lm -g -Os -Wall -mmcu=atmega328p -c lcd.c
 
 clean:
 	@del *.hex *.elf *.o 2>nul

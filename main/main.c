@@ -1,11 +1,12 @@
 // This program shows how to measure the period of a signal using timer 1 free running counter.
 
-#define F_CPU 16000000UL
+//#define F_CPU 16000000UL
 #include <stdio.h>
 #include <stdlib.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include "usart.h"
+#include "lcd.h"
 
 /* Pinout for DIP28 ATMega328P:
 
@@ -26,6 +27,11 @@
   (PCINT0/CLKO/ICP1) PB0 -|14   15|- PB1 (OC1A/PCINT1)
                            -------
 */
+
+#define SW_1 (PINC & 0b00000100)
+#define SW_2 (PINC & 0b00001000)
+#define SW_3 (PINC & 0b00010000)
+
 
 unsigned int cnt = 0;
 
@@ -48,67 +54,138 @@ void waitms(int ms)
 // GetPeriod() seems to work fine for frequencies between 30Hz and 300kHz.
 long int GetPeriod (int n)
 {
-	int i, overflow;
+	int i;
+	unsigned int overflow;
 	unsigned int saved_TCNT1a, saved_TCNT1b;
 	
 	overflow=0;
 
 	TIFR1=1; // TOV1 can be cleared by writing a logic one to its bit location.  Check ATmega328P datasheet page 113.
-	printf("1\r\n");
+	//printf("1\r\n");
 	while (PIN_PERIOD!=0) // Wait for square wave to be 0
 	{
-		printf(".");
-		if(TIFR1&1)	{ TIFR1=1; overflow++; if(overflow>5) return 0;}
+		//printf(".");
+		if(TIFR1&1)	{ 
+			TIFR1=1; 
+			overflow++; 
+			if(overflow>1024) 
+				return 0;
+		}
 	}
-	printf("\r\n");
-	printf("2\r\n");
 	overflow=0;
 	TIFR1=1;
 	while (PIN_PERIOD==0) // Wait for square wave to be 1
 	{
-		printf("-");
-		if(TIFR1&1)	{ TIFR1=1; overflow++; if(overflow>5) return 0;}
+		//printf("-");
+		if(TIFR1&1)	{ 
+			TIFR1=1; 
+			overflow++; 
+			if(overflow>1024) 
+				return 0;
+		}
 	}
-	printf("\r\n");
-	printf("4\r\n");
 	
 	overflow=0;
 	TIFR1=1;
 	saved_TCNT1a=TCNT1;
 	for(i=0; i<n; i++) // Measure the time of 'n' periods
 	{
-		printf("5\r\n");
 		while (PIN_PERIOD!=0) // Wait for square wave to be 0
 		{
-			printf("*\r\n");
-			if(TIFR1&1)	{ TIFR1=1; overflow++; if(overflow>1024) return 0;}
+			if(TIFR1&1)	{ 
+				TIFR1=1; 
+				overflow++; 
+				if(overflow>1024) 
+					return 0;
+			}
 		}
-		printf("\r\n");
-		printf("7\r\n");
 		while (PIN_PERIOD==0) // Wait for square wave to be 1
 		{
-			printf("&");
-			if(TIFR1&1)	{ TIFR1=1; overflow++; if(overflow>1024) return 0;}
+			if(TIFR1&1)	{ 
+				TIFR1=1; overflow++; 
+				if(overflow>1024) 
+					return 0;
+			}
 		}
-		printf("\r\n");
 	}
-	saved_TCNT1b=TCNT1;
-	//if(saved_TCNT1b<saved_TCNT1a) overflow--; // Added an extra overflow.  Get rid of it.
-
-	printf("%ld\r\n", overflow*0x10000L+(saved_TCNT1b-saved_TCNT1a));
+	saved_TCNT1b=TCNT1; // Added an extra overflow.  Get rid of it.
 
 	return overflow*0x10000L+(saved_TCNT1b-saved_TCNT1a);
 }
+void setting_detect (float period, float bpm) {
+	
+	int menu_setting;
+	
+	float frequency;
 
+	float bpm_avg = 0;
+	float bpm_sum = 0;
+	int count = 0;
+
+	char bpm_buffer[17];
+	LCD_4BIT();
+	if((SW_1 == 1)&&(SW_2 == 0) && (SW_3 == 0))
+		menu_setting = 1; //display avg bpm
+	else if((SW_1 == 0)&&(SW_2 == 1) && (SW_3 == 0))
+		menu_setting = 2; //display period
+	else if((SW_1 == 0)&&(SW_2 == 0) && (SW_3 == 1))
+		menu_setting = 3; //display frequency
+	else
+		menu_setting = 0; //default setting displaying bpm
+
+
+	if(menu_setting == 1) {
+			count++;
+			bpm_sum += bpm;
+			bpm_avg = bpm_sum / count;
+
+			sprintf(bpm_buffer, "%.4f", bpm_avg);
+        	LCDprint("Average BPM: ", 1, 1);
+        	LCDprint(bpm_buffer, 2, 1);
+		}
+
+		else if(menu_setting == 2) {
+
+			sprintf(bpm_buffer, "%.4f", period);
+        	LCDprint("Period (s): ", 1, 1);
+        	LCDprint(bpm_buffer, 2, 1);
+		}
+
+		else if(menu_setting == 3) {
+			frequency = (float)1/period;
+
+			sprintf(bpm_buffer, "%.4f", frequency);
+        	LCDprint("Frequency (Hz): ", 1, 1);
+        	LCDprint(bpm_buffer, 2, 1);
+		}
+
+		else {
+		
+		sprintf(bpm_buffer, "%.4f", bpm);
+        LCDprint("Current BPM: ", 1, 1);
+        LCDprint(bpm_buffer, 2, 1);
+		}
+		printf("%3.4f\r\n", period);
+}
 int main(void)
 {
 	long int count;
 	float T;
+	float bpm;
 
 	usart_init(); // Configure the usart and baudrate
-	
-	DDRB  &= 0b11111101; // Configure PB1 as input
+	// uses one hot??
+	DDRB  &= 0b11111101; // Configure PB1 as input\
+	// added by athina
+	// configure additional pins as input
+	DDRC &= 0b11101111; // configure pin \c4 - 27 - 3
+	DDRC &= 0b11110111; // configure pin \c3 - 26 - 2
+	DDRC &= 0b11111011; // configure pin \c2 - 25 - 1
+
 	PORTB |= 0b00000010; // Activate pull-up in PB1
+	//NEED TO INITIALIZE LCD PINS?
+	DDRB|=0b00000001; // PB0 is output.
+	DDRD|=0b11111000; // PD3, PD4, PD5, PD6, and PD7 are outputs.
 
 	// Turn on timer with no prescaler on the clock.  We use it for delays and to measure period.
 	TCCR1B |= _BV(CS10); // Check page 110 of ATmega328P datasheet
@@ -119,17 +196,25 @@ int main(void)
 	
 	while (1)
 	{
+		
 		count=GetPeriod(1);
 		if(count>0)
 		{
-			T=(float)count/(F_CPU*100.0);
-			//f=1/T;
-			printf("T = %f\r\n", T);
+			T=(float)count/(F_CPU);
+			bpm = 60.0/T;
+			//send period to serial
+			
 		}
 		else
 		{
 			printf("NO SIGNAL -- %ld                    \r\n", count);
 		}
+
+		 setting_detect(T, bpm);
+
 		waitms(200);
-	}
+
+	}	
+
+	
 }
