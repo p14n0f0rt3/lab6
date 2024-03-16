@@ -28,9 +28,7 @@
                            -------
 */
 
-#define SW_1 (PINC & 0b00000100)
-#define SW_2 (PINC & 0b00001000)
-#define SW_3 (PINC & 0b00010000)
+
 
 
 unsigned int cnt = 0;
@@ -113,59 +111,33 @@ long int GetPeriod (int n)
 	return overflow*0x10000L+(saved_TCNT1b-saved_TCNT1a);
 }
 void setting_detect (float period, float bpm) {
-	
-	int menu_setting;
+
 	
 	float frequency;
 
-	float bpm_avg = 0;
-	float bpm_sum = 0;
-	int count = 0;
-
 	char bpm_buffer[17];
+
+	frequency = 1/period;
+	printf("%3.4f\r\n", period);
+
 	LCD_4BIT();
-	if((SW_1 == 1)&&(SW_2 == 0) && (SW_3 == 0))
-		menu_setting = 1; //display avg bpm
-	else if((SW_1 == 0)&&(SW_2 == 1) && (SW_3 == 0))
-		menu_setting = 2; //display period
-	else if((SW_1 == 0)&&(SW_2 == 0) && (SW_3 == 1))
-		menu_setting = 3; //display frequency
-	else
-		menu_setting = 0; //default setting displaying bpm
+	sprintf(bpm_buffer, "%.4f", bpm);
+	LCDprint("Current BPM: ", 1, 1);
+	LCDprint(bpm_buffer, 2, 1);
+	waitms(15);
 
+	sprintf(bpm_buffer, "%.4f", period);
+	LCDprint("Period(s): ", 1, 1);
+	LCDprint(bpm_buffer, 2, 1);
 
-	if(menu_setting == 1) {
-			count++;
-			bpm_sum += bpm;
-			bpm_avg = bpm_sum / count;
-
-			sprintf(bpm_buffer, "%.4f", bpm_avg);
-        	LCDprint("Average BPM: ", 1, 1);
-        	LCDprint(bpm_buffer, 2, 1);
-		}
-
-		else if(menu_setting == 2) {
-
-			sprintf(bpm_buffer, "%.4f", period);
-        	LCDprint("Period (s): ", 1, 1);
-        	LCDprint(bpm_buffer, 2, 1);
-		}
-
-		else if(menu_setting == 3) {
-			frequency = (float)1/period;
-
-			sprintf(bpm_buffer, "%.4f", frequency);
-        	LCDprint("Frequency (Hz): ", 1, 1);
-        	LCDprint(bpm_buffer, 2, 1);
-		}
-
-		else {
-		
-		sprintf(bpm_buffer, "%.4f", bpm);
-        LCDprint("Current BPM: ", 1, 1);
-        LCDprint(bpm_buffer, 2, 1);
-		}
-		printf("%3.4f\r\n", period);
+	waitms(15);
+	sprintf(bpm_buffer, "%.4f", frequency);
+	LCDprint("Frequency(Hz): ", 1, 1);
+	LCDprint(bpm_buffer, 2, 1);
+	waitms(15);
+	sprintf(bpm_buffer, "%.4f", bpm);
+	LCDprint("Current BPM: ", 1, 1);
+	LCDprint(bpm_buffer, 2, 1);
 }
 int main(void)
 {
@@ -175,7 +147,7 @@ int main(void)
 
 	usart_init(); // Configure the usart and baudrate
 	// uses one hot??
-	DDRB  &= 0b11111101; // Configure PB1 as input\
+	DDRB  &= 0b11111101; // Configure PB1 as input
 	// added by athina
 	// configure additional pins as input
 	DDRC &= 0b11101111; // configure pin \c4 - 27 - 3
